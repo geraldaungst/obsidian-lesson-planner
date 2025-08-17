@@ -133,9 +133,13 @@ export default class LessonPlannerPlugin extends Plugin {
 			const result = await this.unitAssignmentService.assignUnitToClass();
 			
 			if (result.success) {
-				new Notice(`✅ Unit assignment completed! ${result.message}`, 5000);
+				const message = `✅ Unit assignment completed! ${result.message}`;
+				new Notice(message, 5000);
+				console.log(message); // Add console logging for consistency
 			} else {
-				new Notice(`❌ Unit assignment failed: ${result.error}`, 5000);
+				const errorMessage = `❌ Unit assignment failed: ${result.error}`;
+				new Notice(errorMessage, 5000);
+				console.error(errorMessage); // Use console.error for failures
 			}
 		} catch (error) {
 			console.error('Unit assignment error:', error);
