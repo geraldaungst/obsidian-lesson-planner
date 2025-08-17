@@ -1,242 +1,176 @@
-import { App, Plugin, PluginSettingTab, Setting, Notice } from 'obsidian';
-import { LessonPlannerSettings, DEFAULT_SETTINGS } from './src/types';
+import { App, Editor, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting } from 'obsidian';
 import { FileService } from './src/services/FileService';
 import { ParserService } from './src/services/ParserService';
 import { ScheduleService } from './src/services/ScheduleService';
+// TODO: Uncomment as we implement these services and modals
+// import { UnitAssignmentService } from './src/services/UnitAssignmentService';
+// import { ClassBumpService } from './src/services/ClassBumpService';
+// import { UnitAssignmentModal } from './src/modals/UnitAssignmentModal';
+// import { ClassBumpModal } from './src/modals/ClassBumpModal';
+// import { WholeWeekBumpModal } from './src/modals/WholeWeekBumpModal';
+
+interface LessonPlannerSettings {
+	lessonPlanningRoot: string;
+	enableDebugLogging: boolean;
+}
+
+const DEFAULT_SETTINGS: LessonPlannerSettings = {
+	lessonPlanningRoot: '20 Lesson Planning',
+	enableDebugLogging: false
+}
 
 export default class LessonPlannerPlugin extends Plugin {
-    settings: LessonPlannerSettings;
-    
-    // Core services
-    fileService: FileService;
-    parserService: ParserService;
-    scheduleService: ScheduleService;
+	settings: LessonPlannerSettings;
+	
+	// Services
+	fileService: FileService;
+	parserService: ParserService;
+	scheduleService: ScheduleService;
+	// TODO: Uncomment as we implement these services
+	// unitAssignmentService: UnitAssignmentService;
+	// classBumpService: ClassBumpService;
 
-    async onload() {
-        console.log('Loading Lesson Planner Plugin...');
-        
-        await this.loadSettings();
-        
-        // Initialize services
-        this.initializeServices();
-        
-        // Register commands
-        this.registerCommands();
-        
-        // Add settings tab
-        this.addSettingTab(new LessonPlannerSettingTab(this.app, this));
-        
-        // Add ribbon icon
-        this.addRibbonIcon('calendar-days', 'Lesson Planner', () => {
-            new Notice('Lesson Planner is active!');
-        });
-        
-        console.log('Lesson Planner Plugin loaded successfully');
-    }
+	async onload() {
+		await this.loadSettings();
+		
+		// Initialize services
+		await this.initializeServices();
+		
+		// Register commands
+		this.registerCommands();
 
-    onunload() {
-        console.log('Unloading Lesson Planner Plugin...');
-        
-        // Clean up services
-        if (this.fileService) {
-            this.fileService.invalidateCache();
-        }
-        if (this.parserService) {
-            this.parserService.clearCaches();
-        }
-        if (this.scheduleService) {
-            this.scheduleService.clearCache();
-        }
-    }
+		// Add settings tab
+		this.addSettingTab(new LessonPlannerSettingTab(this.app, this));
 
-    private initializeServices() {
-        // Initialize core services with dependency injection
-        this.fileService = new FileService(this.app, this.settings.lessonPlanningRoot);
-        this.parserService = new ParserService();
-        this.scheduleService = new ScheduleService(this.fileService, this.parserService);
-    }
+		console.log('Lesson Planner Plugin loaded successfully');
+	}
 
-    private registerCommands() {
-        // Test command to verify services are working
-        this.addCommand({
-            id: 'test-services',
-            name: 'Test Services',
-            callback: async () => {
-                await this.testServices();
-            }
-        });
+	private async initializeServices() {
+		try {
+			// Initialize core services
+			this.fileService = new FileService(this.app, this.settings.lessonPlanningRoot);
+			this.parserService = new ParserService();
+			this.scheduleService = new ScheduleService(this.fileService, this.parserService);
+			
+			// TODO: Initialize these services as we implement them
+			// this.unitAssignmentService = new UnitAssignmentService(this.fileService, this.parserService, this.scheduleService);
+			// this.classBumpService = new ClassBumpService(this.fileService, this.parserService, this.scheduleService);
+			
+			console.log('All services initialized successfully');
+		} catch (error) {
+			console.error('Error initializing services:', error);
+			new Notice('Error initializing Lesson Planner services');
+		}
+	}
 
-        // Unit Assignment Command
-        this.addCommand({
-            id: 'assign-unit-to-class',
-            name: 'Assign Unit to Class',
-            callback: () => {
-                this.assignUnitToClass();
-            }
-        });
+	private registerCommands() {
+		// Test command
+		this.addCommand({
+			id: 'test-services',
+			name: 'Test Services',
+			callback: async () => {
+				await this.testServices();
+			}
+		});
 
-        // Single Class Bump Command
-        this.addCommand({
-            id: 'single-class-bump',
-            name: 'Bump Single Class',
-            callback: () => {
-                this.singleClassBump();
-            }
-        });
+		// Unit assignment command - TODO: implement with UnitAssignmentModal
+		this.addCommand({
+			id: 'assign-unit-to-class',
+			name: 'Assign Unit to Class',
+			callback: async () => {
+				// TODO: new UnitAssignmentModal(this.app, this.unitAssignmentService).open();
+				new Notice('Unit assignment - will implement in next step!');
+			}
+		});
 
-        // Whole Day Bump Command
-        this.addCommand({
-            id: 'whole-day-bump',
-            name: 'Bump Whole Day',
-            callback: () => {
-                this.wholeDayBump();
-            }
-        });
+		// Bump commands - TODO: implement with ClassBumpModal and WholeWeekBumpModal
+		this.addCommand({
+			id: 'bump-single-class',
+			name: 'Bump Single Class',
+			callback: async () => {
+				// TODO: new ClassBumpModal(this.app, this.classBumpService).open();
+				new Notice('Single class bump - coming in next step!');
+			}
+		});
 
-        // Open Today's Plans
-        this.addCommand({
-            id: 'open-todays-plans',
-            name: 'Open Today\'s Plans',
-            callback: () => {
-                this.openTodaysPlans();
-            }
-        });
+		this.addCommand({
+			id: 'bump-whole-day',
+			name: 'Bump Whole Day',
+			callback: async () => {
+				// TODO: new WholeWeekBumpModal(this.app, this.classBumpService).open();
+				new Notice('Whole day bump - coming in next step!');
+			}
+		});
+	}
 
-        // Open Weekly View
-        this.addCommand({
-            id: 'open-weekly-view',
-            name: 'Open Weekly View',
-            callback: () => {
-                this.openWeeklyView();
-            }
-        });
+	private async testServices() {
+		try {
+			const units = await this.fileService.getUnitFiles();
+			const classes = await this.fileService.getClassFiles();
+			const holidays = await this.scheduleService.getHolidayDates();
+			
+			const message = `Services working! Found ${units.length} units, ${classes.length} classes, ${holidays.length} holidays`;
+			new Notice(message);
+			console.log(message);
+		} catch (error) {
+			console.error('Service test failed:', error);
+			new Notice('Service test failed - check console for details');
+		}
+	}
 
-        // Clear Cache
-        this.addCommand({
-            id: 'clear-cache',
-            name: 'Clear File Cache',
-            callback: () => {
-                this.clearCache();
-            }
-        });
-    }
+	private async assignUnitToClass() {
+		// TODO: Will implement this when UnitAssignmentService and UnitAssignmentModal are ready
+		// const result = await this.unitAssignmentService.assignUnitToClass();
+		new Notice('Unit assignment workflow - coming next!');
+	}
 
-    // Test function to verify services are working
-    private async testServices() {
-        try {
-            // Test file service
-            const units = await this.fileService.getUnits();
-            const classes = await this.fileService.getClasses();
-            
-            // Test schedule service
-            const holidays = await this.scheduleService.getHolidayDates();
-            const specialSchedules = await this.scheduleService.getSpecialSchedules();
-            
-            new Notice(`✅ Services working! Found ${units.length} units, ${classes.length} classes, ${holidays.length} holidays`);
-            console.log('Service test results:', {
-                units: units.length,
-                classes: classes.length,
-                holidays: holidays.length,
-                specialSchedules
-            });
-        } catch (error) {
-            new Notice(`❌ Service test failed: ${error.message}`);
-            console.error('Service test error:', error);
-        }
-    }    // Command implementations (stub for now, will be fully implemented in next phases)
-    private async assignUnitToClass() {
-        new Notice('Unit assignment - Coming in Phase 2');
-        // TODO: Implement unit assignment workflow
-    }
+	onunload() {
+		console.log('Lesson Planner Plugin unloaded');
+	}
 
-    private async singleClassBump() {
-        new Notice('Single class bump - Coming in Phase 2');
-        // TODO: Implement single class bump workflow
-    }
+	async loadSettings() {
+		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+	}
 
-    private async wholeDayBump() {
-        new Notice('Whole day bump - Coming in Phase 2');
-        // TODO: Implement whole day bump workflow
-    }
-
-    private async openTodaysPlans() {
-        const today = new Date().toISOString().split('T')[0];
-        const todayPlanPath = this.fileService.getFullPath(`Daily Plans/${today}.md`);
-        
-        if (await this.fileService.fileExists(todayPlanPath)) {
-            // Open the file
-            const file = this.app.vault.getAbstractFileByPath(todayPlanPath);
-            if (file) {
-                this.app.workspace.openLinkText(file.path, '', false);
-            }
-        } else {
-            new Notice(`No plans found for today (${today})`);
-        }
-    }
-
-    private async openWeeklyView() {
-        new Notice('Weekly view - Coming in Phase 2');
-        // TODO: Implement weekly view
-    }
-
-    private clearCache() {
-        this.fileService.invalidateCache();
-        this.scheduleService.clearCache();
-        new Notice('Cache cleared');
-    }
-
-    async loadSettings() {
-        this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
-    }
-
-    async saveSettings() {
-        await this.saveData(this.settings);
-    }
+	async saveSettings() {
+		await this.saveData(this.settings);
+	}
 }
 
 class LessonPlannerSettingTab extends PluginSettingTab {
-    plugin: LessonPlannerPlugin;
+	plugin: LessonPlannerPlugin;
 
-    constructor(app: App, plugin: LessonPlannerPlugin) {
-        super(app, plugin);
-        this.plugin = plugin;
-    }
+	constructor(app: App, plugin: LessonPlannerPlugin) {
+		super(app, plugin);
+		this.plugin = plugin;
+	}
 
-    display(): void {
-        const { containerEl } = this;
-        containerEl.empty();
+	display(): void {
+		const {containerEl} = this;
 
-        containerEl.createEl('h2', { text: 'Lesson Planner Settings' });
+		containerEl.empty();
 
-        new Setting(containerEl)
-            .setName('Lesson Planning Root Folder')
-            .setDesc('The root folder for all lesson planning files')
-            .addText(text => text
-                .setPlaceholder('20 Lesson Planning')
-                .setValue(this.plugin.settings.lessonPlanningRoot)
-                .onChange(async (value) => {
-                    this.plugin.settings.lessonPlanningRoot = value;
-                    await this.plugin.saveSettings();
-                }));
+		containerEl.createEl('h2', {text: 'Lesson Planner Settings'});
 
-        new Setting(containerEl)
-            .setName('Enable File Caching')
-            .setDesc('Cache file contents for better performance')
-            .addToggle(toggle => toggle
-                .setValue(this.plugin.settings.enableCache)
-                .onChange(async (value) => {
-                    this.plugin.settings.enableCache = value;
-                    await this.plugin.saveSettings();
-                }));
+		new Setting(containerEl)
+			.setName('Lesson Planning Root Folder')
+			.setDesc('The root folder for all lesson planning files')
+			.addText(text => text
+				.setPlaceholder('20 Lesson Planning')
+				.setValue(this.plugin.settings.lessonPlanningRoot)
+				.onChange(async (value) => {
+					this.plugin.settings.lessonPlanningRoot = value;
+					await this.plugin.saveSettings();
+				}));
 
-        new Setting(containerEl)
-            .setName('Debug Performance')
-            .setDesc('Log performance metrics to console')
-            .addToggle(toggle => toggle
-                .setValue(this.plugin.settings.debugPerformance)
-                .onChange(async (value) => {
-                    this.plugin.settings.debugPerformance = value;
-                    await this.plugin.saveSettings();
-                }));
-    }
+		new Setting(containerEl)
+			.setName('Enable Debug Logging')
+			.setDesc('Enable detailed console logging for troubleshooting')
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.enableDebugLogging)
+				.onChange(async (value) => {
+					this.plugin.settings.enableDebugLogging = value;
+					await this.plugin.saveSettings();
+				}));
+	}
 }
