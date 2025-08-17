@@ -105,6 +105,15 @@ export class UnitAssignmentService {
                 unitInfo.duration
             );
 
+            // Create schedule context - FROM WORKING SCRIPT
+            const scheduleContext = {
+                className: className,
+                regularTime: classInfo.regularTime,
+                earlyDismissalTime: classInfo.earlyDismissalTime,
+                testingDayTime: classInfo.testingDayTime,
+                specialSchedules: await this.scheduleService.getSpecialSchedules()
+            };
+
             // Create daily plan entries
             let createdPlans = 0;
             let skippedPlans = 0;
@@ -117,7 +126,7 @@ export class UnitAssignmentService {
                     unitName,
                     i + 1,
                     unitInfo.duration,
-                    classInfo
+                    scheduleContext
                 );
 
                 if (result.success) createdPlans++;
@@ -149,6 +158,125 @@ export class UnitAssignmentService {
         }
     }
 
+    // COPIED EXACTLY FROM WORKING UNIT ASSIGNMENT SCRIPT
+    private async createDailyPlanEntry(
+        date: string,
+        className: string,
+        unitName: string,
+        dayNumber: number,
+        totalDays: number,
+        scheduleContext: any
+    ): Promise<{ success: boolean; skipped?: boolean; hasScheduleWarning?: boolean }> {
+        try {
+            const dailyPlanPath = this.fileService.getFullPath(`Daily Plans/${date}.md`);
+            let content = "";
+            let isExistingPlan = false;
+            
+            if (this.fileService.fileExists(dailyPlanPath)) {
+                content = await this.fileService.readFile(dailyPlanPath);
+                isExistingPlan = true;
+            } else {
+                // Create new daily plan
+                const [year, month, day] = date.split('-');
+                const dateObj = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+                content = `---
+date: ${date}
+day_of_week: "${dateObj.toLocaleDateString('en-US', {weekday: 'long'})}"
+classes: []
+---
+
+# ${dateObj.toLocaleDateString('en-US', {weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'})}`;
+            }
+
+            // Check for duplicates
+            const classRegex = new RegExp(`## [^\\n]*${className.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[^\\n]*$`, 'm');
+            if (classRegex.test(content)) {
+                return { success: true, skipped: true, hasScheduleWarning: false };
+            }
+            
+            // Calculate correct time and schedule note for this specific date
+            const scheduleType = this.getScheduleTypeForDate(date, scheduleContext.specialSchedules);
+            let classTime = scheduleContext.regularTime;
+            let scheduleNote = "";
+            let hasScheduleWarning = false;
+
+            if (scheduleType === 'early_dismissal') {
+                if (scheduleContext.earlyDismissalTime && 
+                    scheduleContext.earlyDismissalTime.trim() !== "" && 
+                    scheduleContext.earlyDismissalTime !== "TBD") {
+                    classTime = scheduleContext.earlyDismissalTime;
+                    scheduleNote = " (Early Dismissal)";
+                } else {
+                    scheduleNote = " (⚠️ Early Dismissal - using regular time, adjust manually)";
+                    hasScheduleWarning = true;
+                }
+            } else if (scheduleType === 'testing_day') {
+                if (scheduleContext.testingDayTime && 
+                    scheduleContext.testingDayTime !== scheduleContext.regularTime) {
+                    classTime = scheduleContext.testingDayTime;
+                    scheduleNote = " (Testing Day)";
+                } else {
+                    scheduleNote = " (⚠️ Testing Day - using regular time, update testing_day_time when known)";
+                    hasScheduleWarning = true;
+                }
+            }
+
+            // Create class entry with correct transclusion format
+            const transclusionRef = `![[${unitName}#Day ${dayNumber}]]`;            
+            const classEntry = `
+
+## ${classTime} - ${className}${scheduleNote}
+
+**Unit:** [[${unitName}]]  
+**Day:** ${dayNumber} of ${totalDays}  
+**Lesson:** Day ${dayNumber}
+
+### Quick Reference
+
+${transclusionRef}
+
+---
+
+`;
+
+            // Insert class entry in proper time order
+            const insertResult = this.parserService.insertClassByTimeFixed(content, classEntry, classTime, className);
+            content = insertResult.content;
+            
+            if (insertResult.conflict) {
+                console.warn(`Time conflict: ${classTime} already has a class scheduled for ${date}`);
+                new Notice(`Warning: Time conflict at ${classTime} on ${date}`);
+            }
+            
+            // Update frontmatter classes list
+            content = this.parserService.updateClassesList(content, className, 'add');
+
+            // Save the file
+            if (isExistingPlan) {
+                await this.fileService.writeFile(dailyPlanPath, content);
+            } else {
+                await this.fileService.createFile(dailyPlanPath, content);
+            }
+            
+            return { success: true, hasScheduleWarning: hasScheduleWarning };
+            
+        } catch (error) {
+            console.error(`Error creating daily plan for ${date}:`, error);
+            return { success: false, hasScheduleWarning: false };
+        }
+    }
+
+    // Helper method copied from working script
+    private getScheduleTypeForDate(date: string, specialSchedules: any): 'regular' | 'early_dismissal' | 'testing_day' {
+        if (specialSchedules.early_dismissal.includes(date)) {
+            return 'early_dismissal';
+        }
+        if (specialSchedules.testing_day.includes(date)) {
+            return 'testing_day';
+        }
+        return 'regular';
+    }
+
     private async validateAssignmentInputs(unitName: string, className: string, startDate: string): Promise<UnitAssignmentResult> {
         // Check if unit exists
         const units = await this.fileService.getFilesInFolder('Units');
@@ -165,7 +293,7 @@ export class UnitAssignmentService {
         }
 
         // Validate date format
-        if (!this.isValidDate(startDate)) {
+        if (!this.parserService.isValidDate(startDate)) {
             return { success: false, error: 'Invalid date format. Use YYYY-MM-DD' };
         }
 
@@ -272,44 +400,6 @@ export class UnitAssignmentService {
         return dates;
     }
 
-    private async createDailyPlanEntry(
-        date: string,
-        className: string,
-        unitName: string,
-        dayNumber: number,
-        totalDays: number,
-        classInfo: any
-    ): Promise<{ success: boolean; skipped?: boolean; hasScheduleWarning?: boolean }> {
-        try {
-            const dailyPlanPath = `Daily Plans/${date}.md`;
-            
-            // Check if file already exists
-            if (this.fileService.fileExists(dailyPlanPath)) {
-                const content = await this.fileService.readFile(dailyPlanPath);
-                
-                // Check for duplicate class entry
-                const classRegex = new RegExp(`## [^\\n]*${className.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[^\\n]*$`, 'm');
-                if (classRegex.test(content)) {
-                    return { success: true, skipped: true };
-                }
-                
-                // TODO: Add class entry to existing file
-                // For now, just indicate it would be added
-                console.log(`Would add ${className} to existing daily plan: ${date}`);
-                return { success: true };
-            } else {
-                // TODO: Create new daily plan file
-                // For now, just indicate it would be created
-                console.log(`Would create new daily plan: ${date} with ${className}`);
-                return { success: true };
-            }
-            
-        } catch (error) {
-            console.error(`Error creating daily plan for ${date}:`, error);
-            return { success: false };
-        }
-    }
-
     private async updateUnitWithClass(unitName: string, className: string): Promise<void> {
         // TODO: Update unit file to include this class in active_classes
         console.log(`Would update unit ${unitName} to include class ${className}`);
@@ -318,13 +408,6 @@ export class UnitAssignmentService {
     private async updateClassWithUnit(className: string, unitName: string): Promise<void> {
         // TODO: Update class file to include this unit in current_units
         console.log(`Would update class ${className} to include unit ${unitName}`);
-    }
-
-    private isValidDate(dateString: string): boolean {
-        const regex = /^\d{4}-\d{2}-\d{2}$/;
-        if (!regex.test(dateString)) return false;
-        const date = new Date(dateString);
-        return date instanceof Date && !isNaN(date.getTime()) && date.toISOString().split('T')[0] === dateString;
     }
 
     /**
