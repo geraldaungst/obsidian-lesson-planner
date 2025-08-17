@@ -3,11 +3,6 @@ import { FileService } from './src/services/FileService';
 import { ParserService } from './src/services/ParserService';
 import { ScheduleService } from './src/services/ScheduleService';
 import { UnitAssignmentService } from './src/services/UnitAssignmentService';
-// TODO: Uncomment as we implement these services and modals
-// import { ClassBumpService } from './src/services/ClassBumpService';
-// import { UnitAssignmentModal } from './src/modals/UnitAssignmentModal';
-// import { ClassBumpModal } from './src/modals/ClassBumpModal';
-// import { WholeWeekBumpModal } from './src/modals/WholeWeekBumpModal';
 
 interface LessonPlannerSettings {
 	lessonPlanningRoot: string;
@@ -27,8 +22,6 @@ export default class LessonPlannerPlugin extends Plugin {
 	parserService: ParserService;
 	scheduleService: ScheduleService;
 	unitAssignmentService: UnitAssignmentService;
-	// TODO: Uncomment as we implement these services
-	// classBumpService: ClassBumpService;
 
 	async onload() {
 		await this.loadSettings();
@@ -59,9 +52,6 @@ export default class LessonPlannerPlugin extends Plugin {
 				this.scheduleService
 			);
 			
-			// TODO: Initialize these services as we implement them
-			// this.classBumpService = new ClassBumpService(this.fileService, this.parserService, this.scheduleService);
-			
 			console.log('All services initialized successfully');
 		} catch (error) {
 			console.error('Error initializing services:', error);
@@ -79,7 +69,7 @@ export default class LessonPlannerPlugin extends Plugin {
 			}
 		});
 
-		// Unit assignment command - now with UnitAssignmentService
+		// Unit assignment command - now with real testing
 		this.addCommand({
 			id: 'assign-unit-to-class',
 			name: 'Assign Unit to Class',
@@ -88,12 +78,20 @@ export default class LessonPlannerPlugin extends Plugin {
 			}
 		});
 
-		// Bump commands - TODO: implement with ClassBumpModal and WholeWeekBumpModal
+		// NEW: Test real unit assignment with sample data
+		this.addCommand({
+			id: 'test-real-unit-assignment',
+			name: 'Test Real Unit Assignment',
+			callback: async () => {
+				await this.testRealUnitAssignment();
+			}
+		});
+
+		// Bump commands - placeholders for next steps
 		this.addCommand({
 			id: 'bump-single-class',
 			name: 'Bump Single Class',
 			callback: async () => {
-				// TODO: new ClassBumpModal(this.app, this.classBumpService).open();
 				new Notice('Single class bump - coming in next step!');
 			}
 		});
@@ -102,7 +100,6 @@ export default class LessonPlannerPlugin extends Plugin {
 			id: 'bump-whole-day',
 			name: 'Bump Whole Day',
 			callback: async () => {
-				// TODO: new WholeWeekBumpModal(this.app, this.classBumpService).open();
 				new Notice('Whole day bump - coming in next step!');
 			}
 		});
@@ -129,22 +126,104 @@ export default class LessonPlannerPlugin extends Plugin {
 			// Show progress
 			new Notice('Starting unit assignment workflow...');
 			
-			// Use the unit assignment service
+			// Use the unit assignment service (current list-only version)
 			const result = await this.unitAssignmentService.assignUnitToClass();
 			
 			if (result.success) {
-				const message = `✅ Unit assignment completed! ${result.message}`;
+				const message = `✅ Unit assignment workflow ready! ${result.message}`;
 				new Notice(message, 5000);
-				console.log(message); // Add console logging for consistency
+				console.log(message);
 			} else {
 				const errorMessage = `❌ Unit assignment failed: ${result.error}`;
 				new Notice(errorMessage, 5000);
-				console.error(errorMessage); // Use console.error for failures
+				console.error(errorMessage);
 			}
 		} catch (error) {
 			console.error('Unit assignment error:', error);
 			new Notice(`❌ Unit assignment error: ${error.message}`, 5000);
 		}
+	}
+
+	/**
+	 * NEW: Test the real unit assignment logic with sample data
+	 * This will actually create daily plan files
+	 */
+	private async testRealUnitAssignment() {
+		try {
+			new Notice('🧪 Starting real unit assignment test...');
+			
+			// Get available units and classes for testing
+			const availableUnits = await this.unitAssignmentService.getAvailableUnits();
+			const availableClasses = await this.unitAssignmentService.getAvailableClasses();
+			
+			if (availableUnits.length === 0) {
+				new Notice('❌ No units found for testing. Create a unit file first.');
+				return;
+			}
+			
+			if (availableClasses.length === 0) {
+				new Notice('❌ No classes found for testing. Create a class file first.');
+				return;
+			}
+			
+			// Use the first available unit and class for testing
+			const testUnit = availableUnits[0];
+			const testClass = availableClasses[0];
+			
+			// Calculate test start date (next Monday)
+			const testStartDate = this.getNextMonday();
+			
+			// Confirm with user before creating real files
+			const confirmMessage = `Test assignment:\n• Unit: ${testUnit.name} (${testUnit.duration} days)\n• Class: ${testClass.name} (${testClass.dayOfWeek} ${testClass.time})\n• Start: ${testStartDate}\n\nThis will create real daily plan files. Continue?`;
+			
+			// For now, we'll skip the confirmation and proceed
+			// Later we can add a proper confirmation modal
+			new Notice(`Testing: ${testUnit.name} → ${testClass.name} starting ${testStartDate}`, 3000);
+			
+			// Execute real unit assignment
+			const result = await this.unitAssignmentService.assignUnitToClassWithOptions({
+				unitName: testUnit.name,
+				className: testClass.name,
+				startDate: testStartDate
+			});
+			
+			if (result.success) {
+				const successMessage = `✅ Real unit assignment test successful!\n${result.message}`;
+				new Notice(successMessage, 8000);
+				console.log('Real Unit Assignment Test Results:', result);
+				
+				// Show detailed results
+				if (result.createdPlans > 0) {
+					console.log(`📝 Created ${result.createdPlans} daily plan files`);
+				}
+				if (result.skippedPlans > 0) {
+					console.log(`⏭️ Skipped ${result.skippedPlans} duplicate entries`);
+				}
+				if (result.scheduleWarnings > 0) {
+					console.log(`⚠️ ${result.scheduleWarnings} schedule warnings need review`);
+				}
+				
+			} else {
+				const errorMessage = `❌ Real unit assignment test failed: ${result.error}`;
+				new Notice(errorMessage, 5000);
+				console.error('Real Unit Assignment Test Error:', result);
+			}
+			
+		} catch (error) {
+			console.error('Real unit assignment test error:', error);
+			new Notice(`❌ Test error: ${error.message}`, 5000);
+		}
+	}
+
+	/**
+	 * Helper method to get next Monday's date in YYYY-MM-DD format
+	 */
+	private getNextMonday(): string {
+		const today = new Date();
+		const daysUntilMonday = (8 - today.getDay()) % 7;
+		const nextMonday = new Date(today);
+		nextMonday.setDate(today.getDate() + (daysUntilMonday === 0 ? 7 : daysUntilMonday));
+		return nextMonday.toISOString().split('T')[0];
 	}
 
 	onunload() {

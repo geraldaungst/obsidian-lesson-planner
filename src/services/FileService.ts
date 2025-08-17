@@ -66,6 +66,21 @@ export class FileService {
         }
     }
 
+    // ADD: Missing createFile method that UnitAssignmentService expects
+    async createFile(path: string, content: string): Promise<boolean> {
+        try {
+            const normalizedPath = normalizePath(path);
+            await this.app.vault.create(normalizedPath, content);
+            
+            // Update cache
+            this.cache.set(normalizedPath, content);
+            return true;
+        } catch (error) {
+            console.error(`Error creating file ${path}:`, error);
+            return false;
+        }
+    }
+
     async getFilesInFolder(folderPath: string, pattern?: RegExp): Promise<TFile[]> {
         try {
             const normalizedPath = normalizePath(`${this.rootPath}/${folderPath}`);
