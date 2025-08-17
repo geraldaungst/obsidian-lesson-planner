@@ -105,8 +105,9 @@ export default class LessonPlannerPlugin extends Plugin {
 
 	private async testServices() {
 		try {
-			const units = await this.fileService.getUnitFiles();
-			const classes = await this.fileService.getClassFiles();
+			// Use the existing FileService methods
+			const units = await this.fileService.getFilesInFolder('Units');
+			const classes = await this.fileService.getFilesInFolder('Classes');
 			const holidays = await this.scheduleService.getHolidayDates();
 			
 			const message = `Services working! Found ${units.length} units, ${classes.length} classes, ${holidays.length} holidays`;
