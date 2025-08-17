@@ -15,45 +15,126 @@ import {
 export class ParserService {
     private timeCache = new Map<string, ParsedTime>();
     
-    // Time parsing with school day logic
+    // Time parsing function with school day AM/PM logic - COPIED FROM WORKING SCRIPT
     parseTimeToMinutes(timeStr: string): number {
-        if (this.timeCache.has(timeStr)) {
-            return this.timeCache.get(timeStr)!.totalMinutes;
-        }
-
-        const match = timeStr.match(TIME_REGEX);
-        if (!match) {
+        // Match H:MM or HH:MM format exactly
+        const timeMatch = timeStr.match(/^(\d{1,2}):(\d{2})$/);
+        
+        if (!timeMatch) {
             console.error(`Invalid time format: "${timeStr}". Expected H:MM or HH:MM format.`);
-            return 0;
+            return 0; // Default to midnight if parsing fails
         }
-
-        let hours = parseInt(match[1], 10);
-        const minutes = parseInt(match[2], 10);
-
+        
+        let hours = parseInt(timeMatch[1], 10);
+        const minutes = parseInt(timeMatch[2], 10);
+        
         if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
             console.error(`Invalid time values: "${timeStr}". Hours must be 0-23, minutes 0-59.`);
             return 0;
         }
-
+        
         // School day logic: Hours 1-7 are assumed to be PM (13-19 in 24-hour)
         // Hours 8-12 are assumed to be AM (8-12 in 24-hour)
+        // Hours 0, 13-23 are left as-is (24-hour format)
         if (hours >= 1 && hours <= 7) {
             hours += 12; // Convert 1:00-7:59 to 13:00-19:59 (PM)
         }
-
-        const totalMinutes = hours * 60 + minutes;
         
-        // Cache the result
-        this.timeCache.set(timeStr, {
-            hours,
-            minutes,
-            totalMinutes,
-            originalString: timeStr
-        });
-
+        const totalMinutes = hours * 60 + minutes;
         return totalMinutes;
     }
 
+    // Time insertion function for format: ## H:MM - Class Name - COPIED FROM WORKING SCRIPT
+    insertClassByTimeFixed(content: string, classEntry: string, newTime: string, className: string): { content: string; conflict: boolean } {
+        const lines = content.split('\n');
+        const newTimeMinutes = this.parseTimeToMinutes(newTime);
+        
+        let insertIndex = -1;
+        let timeConflict = false;
+        const existingTimes = [];
+        
+        // Find all existing class times and their positions
+        for (let i = 0; i < lines.length; i++) {
+            // Match exact format: ## H:MM - Class Name or ## HH:MM - Class Name
+            const timeMatch = lines[i].match(/^## (\d{1,2}:\d{2}) - /);
+            if (timeMatch) {
+                const existingTime = timeMatch[1];
+                const existingTimeMinutes = this.parseTimeToMinutes(existingTime);
+                
+                existingTimes.push({
+                    time: existingTime,
+                    minutes: existingTimeMinutes,
+                    lineIndex: i
+                });
+                
+                // Check for exact time conflict
+                if (newTimeMinutes === existingTimeMinutes) {
+                    timeConflict = true;
+                }
+            }
+        }
+        
+        // Sort existing times to find correct insertion point
+        existingTimes.sort((a, b) => a.minutes - b.minutes);
+        
+        // Find where to insert the new class
+        for (const existing of existingTimes) {
+            if (newTimeMinutes < existing.minutes) {
+                insertIndex = existing.lineIndex;
+                break;
+            }
+        }
+        
+        // If no insertion point found, append at the end
+        if (insertIndex === -1) {
+            return { content: content + '\n' + classEntry + '\n', conflict: timeConflict };
+        }
+        
+        let actualInsertIndex = insertIndex;
+        let foundExistingDivider = false;
+        
+        // Look backward from insertion point to see if there's a divider we should insert above
+        for (let i = insertIndex - 1; i >= 0; i--) {
+            if (lines[i].trim() === '---') {
+                // Found a divider above the insertion point - insert above it
+                actualInsertIndex = i;
+                foundExistingDivider = true;
+                break;
+            } else if (lines[i].trim() !== '' && !lines[i].match(/^## \d{1,2}:\d{2} - /)) {
+                // Found non-empty, non-class content - stop looking
+                break;
+            }
+        }
+        
+        // Clean insertion: remove any existing dividers from classEntry and add properly
+        const cleanedClassEntry = classEntry.replace(/^---\s*\n?/gm, '').replace(/\n---\s*$/gm, '');
+        const classEntryLines = cleanedClassEntry.trim().split('\n');
+        
+        // Insert content - handle divider placement properly
+        let insertContent;
+        if (foundExistingDivider) {
+            // Insert above existing divider: add divider above, use existing below
+            insertContent = ['---', '', ...classEntryLines, '']; 
+        } else {
+            // No existing divider: add divider below
+            insertContent = [...classEntryLines, '', '---'];
+        }
+
+        lines.splice(actualInsertIndex, 0, ...insertContent);
+        
+        return { content: lines.join('\n'), conflict: timeConflict };
+    }
+
+    // Validation for date format - COPIED FROM WORKING SCRIPT
+    isValidDate(dateString: string): boolean {
+        const regex = /^\d{4}-\d{2}-\d{2}$/;
+        if (!regex.test(dateString)) return false;
+        const date = new Date(dateString);
+        return date instanceof Date && !isNaN(date.getTime()) && date.toISOString().split('T')[0] === dateString;
+    }
+
+    // Rest of existing ParserService methods remain unchanged...
+    
     // Parse daily plan from file content
     parseDailyPlan(content: string, filePath: string): DailyPlan | null {
         try {
@@ -244,7 +325,7 @@ export class ParserService {
                 break; // Stop at separator
             }
             
-            // Check for section headers
+            // Check for section headers - ONLY look at lines that start with ##
             if (line.startsWith('##') && line.toLowerCase().includes('early dismissal')) {
                 currentType = 'early_dismissal';
                 continue;
@@ -265,7 +346,7 @@ export class ParserService {
         return schedules;
     }
 
-    // Update frontmatter classes list
+    // Update frontmatter classes list - COPIED FROM WORKING SCRIPT
     updateClassesList(content: string, className: string, action: 'add' | 'remove'): string {
         const classesMatch = content.match(FRONTMATTER_CLASSES_REGEX);
         
