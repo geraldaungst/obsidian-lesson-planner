@@ -39,11 +39,31 @@ export class UnitAssignmentService {
      */
     async assignUnitToClass(): Promise<UnitAssignmentResult> {
         try {
-            // For now, return a placeholder - we'll implement the modal selection in the next step
+            // For now, we'll implement a simple workflow without modal
+            // Later we'll replace this with a proper modal interface
+            
+            // Get available units and classes
+            const availableUnits = await this.getAvailableUnits();
+            const availableClasses = await this.getAvailableClasses();
+            
+            if (availableUnits.length === 0) {
+                return { success: false, error: "No units found in Units folder" };
+            }
+            
+            if (availableClasses.length === 0) {
+                return { success: false, error: "No classes found in Classes folder" };
+            }
+            
+            // For now, just show what we found and return a descriptive message
+            // Later we'll implement the modal for user selection
+            const unitsText = availableUnits.map(u => `${u.name} (${u.duration} days)`).join(', ');
+            const classesText = availableClasses.map(c => `${c.name} (${c.dayOfWeek} ${c.time})`).join(', ');
+            
             return {
-                success: false,
-                error: "Interactive assignment not yet implemented - needs modal UI"
+                success: true,
+                message: `Found ${availableUnits.length} units: ${unitsText}. Found ${availableClasses.length} classes: ${classesText}. Modal interface coming next!`
             };
+            
         } catch (error) {
             console.error('Unit assignment error:', error);
             return {
