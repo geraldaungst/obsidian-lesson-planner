@@ -2,8 +2,8 @@ import { App, Editor, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Set
 import { FileService } from './src/services/FileService';
 import { ParserService } from './src/services/ParserService';
 import { ScheduleService } from './src/services/ScheduleService';
+import { UnitAssignmentService } from './src/services/UnitAssignmentService';
 // TODO: Uncomment as we implement these services and modals
-// import { UnitAssignmentService } from './src/services/UnitAssignmentService';
 // import { ClassBumpService } from './src/services/ClassBumpService';
 // import { UnitAssignmentModal } from './src/modals/UnitAssignmentModal';
 // import { ClassBumpModal } from './src/modals/ClassBumpModal';
@@ -26,8 +26,8 @@ export default class LessonPlannerPlugin extends Plugin {
 	fileService: FileService;
 	parserService: ParserService;
 	scheduleService: ScheduleService;
+	unitAssignmentService: UnitAssignmentService;
 	// TODO: Uncomment as we implement these services
-	// unitAssignmentService: UnitAssignmentService;
 	// classBumpService: ClassBumpService;
 
 	async onload() {
@@ -52,8 +52,14 @@ export default class LessonPlannerPlugin extends Plugin {
 			this.parserService = new ParserService();
 			this.scheduleService = new ScheduleService(this.fileService, this.parserService);
 			
+			// Initialize unit assignment service
+			this.unitAssignmentService = new UnitAssignmentService(
+				this.fileService, 
+				this.parserService, 
+				this.scheduleService
+			);
+			
 			// TODO: Initialize these services as we implement them
-			// this.unitAssignmentService = new UnitAssignmentService(this.fileService, this.parserService, this.scheduleService);
 			// this.classBumpService = new ClassBumpService(this.fileService, this.parserService, this.scheduleService);
 			
 			console.log('All services initialized successfully');
@@ -73,13 +79,12 @@ export default class LessonPlannerPlugin extends Plugin {
 			}
 		});
 
-		// Unit assignment command - TODO: implement with UnitAssignmentModal
+		// Unit assignment command - now with UnitAssignmentService
 		this.addCommand({
 			id: 'assign-unit-to-class',
 			name: 'Assign Unit to Class',
 			callback: async () => {
-				// TODO: new UnitAssignmentModal(this.app, this.unitAssignmentService).open();
-				new Notice('Unit assignment - will implement in next step!');
+				await this.assignUnitToClass();
 			}
 		});
 
@@ -120,9 +125,22 @@ export default class LessonPlannerPlugin extends Plugin {
 	}
 
 	private async assignUnitToClass() {
-		// TODO: Will implement this when UnitAssignmentService and UnitAssignmentModal are ready
-		// const result = await this.unitAssignmentService.assignUnitToClass();
-		new Notice('Unit assignment workflow - coming next!');
+		try {
+			// Show progress
+			new Notice('Starting unit assignment workflow...');
+			
+			// Use the unit assignment service
+			const result = await this.unitAssignmentService.assignUnitToClass();
+			
+			if (result.success) {
+				new Notice(`✅ Unit assignment completed! ${result.message}`, 5000);
+			} else {
+				new Notice(`❌ Unit assignment failed: ${result.error}`, 5000);
+			}
+		} catch (error) {
+			console.error('Unit assignment error:', error);
+			new Notice(`❌ Unit assignment error: ${error.message}`, 5000);
+		}
 	}
 
 	onunload() {
